@@ -377,14 +377,12 @@ class Qwen25_SigLIPConfig(PretrainedConfig):
             # For BC use all kwargs to init `TextConfig`
             self.text_config = self.sub_configs["text_config"](**kwargs)
         
-        # 补充额外的配置
         self.vision_token_id = vision_token_id
         self.image_token_id = image_token_id
         self.video_token_id = video_token_id
         self.vision_start_token_id = vision_start_token_id
         self.vision_end_token_id = vision_end_token_id
 
-        # 补充rope
         self.rope_scaling = {
             "mrope_section": [
                 16,
@@ -398,7 +396,6 @@ class Qwen25_SigLIPConfig(PretrainedConfig):
         
         rope_config_validation(self, ignore_keys={"mrope_section"})
 
-        # 对齐text_config的hidden_size和visual_config的out_hidden_size
         self.vision_config.out_hidden_size = self.text_config.hidden_size
 
         # Attention implementation to use. It sets it recursively on sub-configs so we call it again in the end

@@ -567,7 +567,6 @@ class Qwen25_SigLIPTextModel(Qwen25_SigLIPPreTrainedModel):
 
         hidden_states = inputs_embeds
 
-        # static_position_embeddings在此计算，直接传递给attention
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
         static_position_embeddings = self.static_rotary_emb(hidden_states, static_position_ids)
 

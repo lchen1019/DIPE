@@ -24,7 +24,6 @@ RGB_MAP = {
     "yellow": (255, 255, 0), "purple": (128, 0, 128), "orange": (255, 165, 0), "grey": (128, 128, 128)
 }
 
-# ================== 初始化 ==================
 os.makedirs(IMAGE_DIR, exist_ok=True)
 for color in COLORS:
     img_path = COLOR_TO_PATH[color]
@@ -32,10 +31,8 @@ for color in COLORS:
         img = Image.new("RGB", (128, 128), RGB_MAP.get(color, (128, 128, 128)))
         img.save(img_path)
 
-# ================== 核心逻辑 ==================
 
 def generate_unique_text(existing_set):
-    """生成唯一文本"""
     while True:
         prefix = random.choice(TEXT_PREFIXES)
         num = random.randint(100, 999)
@@ -45,36 +42,25 @@ def generate_unique_text(existing_set):
             return text
 
 def get_anchor_desc(item):
-    """生成用于提问的自然语言描述（无编号）"""
     if item["type"] == "text":
         return f'the text snippet "{item["content"]}"'
     else:
         return f'the {item["color"]} image'
 
 def build_sequence(difficulty="easy"):
-    """
-    构建序列。
-    为了保证无编号情况下问题可解，我们需要尽量保证元素的唯一性，
-    否则如果有两个红图，问“红图后面是什么”就有歧义。
-    """
     length = random.randint(*LEN_EASY) if difficulty == "easy" else random.randint(*LEN_HARD)
     
-    # 随机决定图文数量
     num_images = random.randint(1, length - 1)
     num_texts = length - num_images
     
-    # 强制颜色唯一 (sample 不会重复)
-    # 如果需要的图片数量超过颜色总数（很难发生），则允许重复，但在生成问题时会过滤掉重复的锚点
     if num_images <= len(COLORS):
         selected_colors = random.sample(COLORS, k=num_images)
     else:
         selected_colors = random.choices(COLORS, k=num_images)
 
-    # 文本生成
     existing_texts = set()
     selected_texts = [generate_unique_text(existing_texts) for _ in range(num_texts)]
 
-    # 混合
     items = []
     for c in selected_colors:
         items.append({"type": "image", "color": c})
@@ -85,7 +71,6 @@ def build_sequence(difficulty="easy"):
     return items
 
 def check_uniqueness(target_item, all_items):
-    """检查某个 item 在整个序列中是否在语义上是唯一的"""
     if target_item["type"] == "text":
         count = sum(1 for x in all_items if x["type"] == "text" and x["content"] == target_item["content"])
     else:
@@ -101,15 +86,12 @@ def main():
         difficulty = "easy" if random.random() < EASY_RATIO else "hard"
         items = build_sequence(difficulty)
         
-        # 寻找合法的三元组 (i, i+1, i+2)
-        # 关键条件：i 和 i+2 (锚点) 必须在整个序列中唯一
         candidates = []
         for i in range(len(items) - 2):
             left = items[i]
             mid = items[i+1]
             right = items[i+2]
             
-            # 只有当左右锚点都是唯一的时候，才能提问，否则有歧义
             if check_uniqueness(left, items) and check_uniqueness(right, items):
                 candidates.append((left, mid, right))
         
@@ -118,10 +100,6 @@ def main():
             
         left_item, target_item, right_item = random.choice(candidates)
 
-        # ================== 构建 Prompt (无编号流) ==================
-        # 这里的关键是把图和文“自然”地拼在一起，不用 Item 1 这种人工标签
-        
-        # 1. Example 部分 (也去掉编号，保持一致性)
         example_text = (
             "I will show you a sequence of images and texts. Please identify the object located immediately between two specific items.\n\n"
             "--- EXAMPLE ---\n"
@@ -134,25 +112,17 @@ def main():
         
         final_user_content = [{"type": "text", "text": example_text}]
         
-        # 2. 实际序列构建
-        # 格式：[Image] \n Text: "..." \n [Image] ...
         for item in items:
             if item["type"] == "image":
-                # 图片
                 final_user_content.append({"type": "image", "image": COLOR_TO_PATH[item["color"]]})
-                # 加个换行符作为分隔，防止粘连，但没有任何编号
                 final_user_content.append({"type": "text", "text": "\n"})
             else:
-                # 文本
                 final_user_content.append({"type": "text", "text": f'Text: "{item["content"]}"\n'})
 
-        # ================== 构建问题 ==================
         
-        # 答案生成
         if target_item["type"] == "image":
             q_target_type = "image"
             correct_answer = f'{target_item["color"].capitalize()} image'
-            # 干扰项：其他颜色的图片
             other_colors = [c.capitalize() + " image" for c in COLORS if c != target_item["color"]]
             random.shuffle(other_colors)
             options = [correct_answer] + other_colors[:3]
@@ -160,9 +130,6 @@ def main():
             q_target_type = "text"
             correct_answer = f'Text: "{target_item["content"]}"'
             
-            # 干扰项生成策略 (高难度)：
-            # 1. 优先选序列里存在的其他文本 (Contextual Distractors) - 强迫模型定位
-            # 2. 不够再选随机文本
             context_distractors = [
                 f'Text: "{x["content"]}"' 
                 for x in items 
@@ -171,14 +138,11 @@ def main():
             
             random_distractors = []
             while len(random_distractors) < 3:
-                t = generate_unique_text(set()) # 生成任意假文本
+                t = generate_unique_text(set())
                 random_distractors.append(f'Text: "{t}"')
                 
-            # 混合干扰项
             distractors = context_distractors + random_distractors
-            # 去重并切片
             distractors = list(set(distractors))[:3]
-            # 如果还不够3个（比如序列里只有一个文本），补足
             while len(distractors) < 3:
                 t = generate_unique_text(set())
                 distractors.append(f'Text: "{t}"')

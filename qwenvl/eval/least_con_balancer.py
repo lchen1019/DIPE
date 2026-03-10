@@ -21,27 +21,10 @@ class Backend:
         self.name = name
         self.url = url
         self.healthy = True
-        self.active_requests = 0  # 当前正在处理的请求数
-        self.lock = asyncio.Lock() # 确保计数器并发安全
+        self.active_requests = 0
+        self.lock = asyncio.Lock()
 
 LOCAL_IP = os.getenv("LOCAL_IP", "localhost")
-# BACKENDS_DATA = [
-#     {"url": f"http://{LOCAL_IP}:8100", "name": "instance-0", "healthy": True},
-#     {"url": f"http://{LOCAL_IP}:8101", "name": "instance-1", "healthy": True},
-#     {"url": f"http://{LOCAL_IP}:8102", "name": "instance-2", "healthy": True},
-#     {"url": f"http://{LOCAL_IP}:8103", "name": "instance-3", "healthy": True},
-#     {"url": f"http://{LOCAL_IP}:8104", "name": "instance-4", "healthy": True},
-#     {"url": f"http://{LOCAL_IP}:8105", "name": "instance-5", "healthy": True},
-#     {"url": f"http://{LOCAL_IP}:8106", "name": "instance-6", "healthy": True},
-#     {"url": f"http://{LOCAL_IP}:8107", "name": "instance-7", "healthy": True},
-# ]
-
-# WORKER_CONFIG_PATH = "scripts/eval/distribution_config.yaml"
-# worker_hosts = []
-# with open(WORKER_CONFIG_PATH, 'r') as f:
-#     config = yaml.safe_load(f)
-#     worker_hosts = config.get('worker_hosts', [])
-# worker_hosts.append(LOCAL_IP)
 hosts_str = os.environ.get('WORKER_HOSTS', "")
 worker_hosts = hosts_str.split()
 worker_hosts.append(LOCAL_IP)
@@ -57,7 +40,7 @@ backends_list = [Backend(b["name"], b["url"]) for b in BACKENDS_DATA]
 
 class ChatMessage(BaseModel):
     role: str
-    content: Any # 修改为Any以兼容多模态或字符串
+    content: Any
 
 
 class ChatCompletionRequest(BaseModel):
@@ -74,18 +57,11 @@ class LoadBalancer:
         self.backends = backends
     
     async def get_least_loaded_backend(self) -> Optional[Backend]:
-        """
-        策略：最小连接数 (Least Connections)
-        选择当前 active_requests 最小且健康的后端
-        """
-        # 筛选健康节点
         healthy_backends = [b for b in self.backends if b.healthy]
         
         if not healthy_backends:
             return None
         
-        # 核心逻辑：按 active_requests 排序，取最小的
-        # 如果有多个负载相同的，随机选择一个，避免羊群效应
         min_load = min(b.active_requests for b in healthy_backends)
         candidates = [b for b in healthy_backends if b.active_requests == min_load]
         
@@ -138,7 +114,6 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 async def health():
-    """健康检查端点"""
     healthy_count = sum(1 for b in BACKENDS_DATA if b["healthy"])
     return {
         "status": "healthy" if healthy_count > 0 else "unhealthy",
@@ -149,7 +124,6 @@ async def health():
 
 @app.get("/v1/models")
 async def list_models():
-    """列出可用模型"""
     return {
         "object": "list",
         "data": [
@@ -178,14 +152,13 @@ async def proxy_request(backend: Backend, path: str, request_data: Dict, stream:
 
 @app.get("/backends/status")
 async def backends_status():
-    """查看当前负载分布"""
     return {
         "backends": [
             {
                 "name": b.name,
                 "url": b.url,
                 "healthy": b.healthy,
-                "active_requests": b.active_requests # 关键指标
+                "active_requests": b.active_requests
             }
             for b in backends_list
         ]
@@ -193,7 +166,6 @@ async def backends_status():
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
-    # 使用最小负载策略获取后端
     backend = await load_balancer.get_least_loaded_backend()
     
     if not backend:
@@ -201,13 +173,9 @@ async def chat_completions(request: ChatCompletionRequest):
     
     request_data = request.model_dump(exclude_none=True)
     
-    # 使用 track_requests 上下文管理器包裹整个请求过程
-    # 注意：对于流式响应，必须确保生成器结束时才释放计数
-    
     try:
         if request.stream:
             async def generate_with_tracking():
-                # 进入上下文，计数+1
                 async with track_requests(backend):
                     try:
                         async for chunk in proxy_request(backend, "/v1/chat/completions", request_data, stream=True):
@@ -215,11 +183,9 @@ async def chat_completions(request: ChatCompletionRequest):
                     except Exception:
                         load_balancer.mark_unhealthy(backend)
                         raise
-                # 离开上下文，计数-1 (生成器结束时触发)
 
             return StreamingResponse(generate_with_tracking(), media_type="text/event-stream")
         else:
-            # 非流式请求
             async with track_requests(backend):
                 async for response in proxy_request(backend, "/v1/chat/completions", request_data, stream=False):
                     if response.status_code != 200:
@@ -232,8 +198,6 @@ async def chat_completions(request: ChatCompletionRequest):
         raise HTTPException(status_code=504, detail="Backend timeout")
 
     except Exception as e:
-        # 如果在建立连接前就报错了，这里需要确保不会导致计数器泄漏
-        # 但由于 track_requests 包裹了核心逻辑，通常是安全的
         raise HTTPException(status_code=502, detail=f"Proxy error: {str(e)}")
 
 
