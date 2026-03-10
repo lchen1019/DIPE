@@ -62,9 +62,9 @@ If you find our work helpful for your research, please consider citing the follo
 
 ```
 @article{chen2026dipe,
-    title = {Beyond Sequential Distance: Inter-Modal
-Distance Invariant Position Encoding},
+    title = {Beyond Sequential Distance: Inter-Modal Distance Invariant Position Encoding},
     author = {Lin Chen and Bolin Ni and Qi Yang and Zili Wang and Kun Ding and Ying Wang and Houwen Peng and Shiming Xiang},
+    journal={arXiv preprint arXiv:26xx.xxxxx},
     year = {2026},
 }
 ```
