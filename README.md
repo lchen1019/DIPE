@@ -1,8 +1,8 @@
 # <div align="center">Beyond Sequential Distance: Inter-Modal Distance Invariant Position Encoding<div>
 <div align="center">
   <div>
-  <a href="https://arxiv.org/abs/xxx.xxx"><img src="https://img.shields.io/static/v1?label=Paper&message=Arxiv:DIPE&color=red&logo=arxiv"></a>&nbsp;&nbsp;
-  <a href="[https://arxiv.org/abs/xxx.xxx](https://arxiv.org/abs/xxx.xxxx)"><img src="https://img.shields.io/badge/license-MIT-yellow"></a>
+  <a href="https://arxiv.org/pdf/2603.10863"><img src="https://img.shields.io/static/v1?label=Paper&message=Arxiv:DIPE&color=red&logo=arxiv"></a>&nbsp;&nbsp;
+  <a href="[https://arxiv.org/pdf/2603.10863](https://arxiv.org/pdf/2603.10863)"><img src="https://img.shields.io/badge/license-MIT-yellow"></a>
   </div>
 </div>
 
@@ -63,8 +63,8 @@ If you find our work helpful for your research, please consider citing the follo
 ```
 @article{chen2026dipe,
     title = {Beyond Sequential Distance: Inter-Modal Distance Invariant Position Encoding},
-    author = {Lin Chen and Bolin Ni and Qi Yang and Zili Wang and Kun Ding and Ying Wang and Houwen Peng and Shiming Xiang},
-    journal={arXiv preprint arXiv:26xx.xxxxx},
+    author={Chen, Lin and Ni, Bolin and Yang, Qi and Wang, Zili and Ding, Kun and Wang, Ying and Peng, Houwen and Xiang, Shiming},
+    journal={arXiv preprint arXiv:2603.10863},
     year = {2026},
 }
 ```
