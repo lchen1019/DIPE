@@ -16,6 +16,7 @@ Despite the remarkable capabilities of Multimodal Large Language Models (MLLMs),
 
 ## :fire: News
 
+- **`2026/06/18`**: DIPE is accepted by ECCV 2026!
 - **`2026/03/10`**: Training and Evaluation Code is available Now! Currently, we only release the implementation with eagar attention for stability.
 
 
